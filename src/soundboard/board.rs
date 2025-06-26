@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use crate::soundboard::sound::SoundEffect;
 use crate::soundboard::keybinding::KeyCode;
+use crate::audio::AudioPlayer;
 use crate::error::{AppError, Result};
 
 /// 音效板
@@ -19,8 +20,7 @@ pub struct SoundBoard {
     categories: HashMap<String, SoundCategory>,
     keybindings: HashMap<KeyCode, String>,
     config: SoundBoardConfig,
-    // TODO: 添加音频播放器
-    // player: Arc<Mutex<AudioPlayer>>,
+    player: Arc<Mutex<AudioPlayer>>,
 }
 
 /// 音效分类
@@ -85,11 +85,16 @@ impl SoundBoard {
         };
         categories.insert(music_category.id.clone(), music_category);
 
+        // 创建音频播放器
+        let player = AudioPlayer::new()
+            .map_err(|e| AppError::soundboard(format!("无法创建音频播放器: {}", e)))?;
+
         Ok(Self {
             sounds: HashMap::new(),
             categories,
             keybindings: HashMap::new(),
             config: SoundBoardConfig::default(),
+            player: Arc::new(Mutex::new(player)),
         })
     }
 
@@ -145,32 +150,38 @@ impl SoundBoard {
         let sound = self.sounds.get(sound_id)
             .ok_or_else(|| AppError::soundboard("音效不存在"))?;
 
-        // TODO: 实现实际的音频播放
         info!("播放音效: {} ({})", sound.name, sound.file_path.display());
 
-        // 临时模拟播放
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        // 使用音频播放器播放文件
+        let player = self.player.lock().await;
+        player.play_file(&sound.file_path).await
+            .map_err(|e| AppError::soundboard(format!("播放音效失败: {}", e)))?;
 
         Ok(())
     }
 
     /// 停止音效
-    pub fn stop_sound(&self, sound_id: &str) -> Result<()> {
+    pub async fn stop_sound(&self, sound_id: &str) -> Result<()> {
         debug!("停止音效: {}", sound_id);
 
         let _sound = self.sounds.get(sound_id)
             .ok_or_else(|| AppError::soundboard("音效不存在"))?;
 
-        // TODO: 实现实际的音频停止
         info!("停止音效: {}", sound_id);
+
+        // 停止当前播放
+        let player = self.player.lock().await;
+        player.stop().await;
 
         Ok(())
     }
 
     /// 停止所有音效
-    pub fn stop_all_sounds(&self) {
+    pub async fn stop_all_sounds(&self) {
         info!("停止所有音效");
-        // TODO: 实现停止所有音效
+
+        let player = self.player.lock().await;
+        player.stop().await;
     }
 
     /// 获取音效列表

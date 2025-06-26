@@ -255,29 +255,135 @@ impl KeyCode {
 /// 快捷键绑定管理器
 #[derive(Debug)]
 pub struct KeyBindingManager {
-    // TODO: 实现全局快捷键监听
-    // global_hooks: HashMap<KeyCode, Box<dyn Fn() + Send + Sync>>,
+    // 使用global-hotkey库实现全局快捷键
+    hotkey_manager: Option<global_hotkey::GlobalHotKeyManager>,
+    registered_hotkeys: std::collections::HashMap<KeyCode, global_hotkey::HotKey>,
 }
 
 impl KeyBindingManager {
     /// 创建新的快捷键管理器
-    pub fn new() -> Self {
-        Self {
-            // global_hooks: HashMap::new(),
-        }
+    pub fn new() -> crate::error::Result<Self> {
+        let hotkey_manager = global_hotkey::GlobalHotKeyManager::new()
+            .map_err(|e| crate::error::AppError::soundboard(format!("无法创建全局快捷键管理器: {}", e)))?;
+
+        Ok(Self {
+            hotkey_manager: Some(hotkey_manager),
+            registered_hotkeys: std::collections::HashMap::new(),
+        })
     }
 
     /// 注册全局快捷键
-    pub fn register_global_hotkey(&mut self, _key: KeyCode, _callback: Box<dyn Fn() + Send + Sync>) -> crate::error::Result<()> {
-        // TODO: 实现Windows全局快捷键注册
-        // 需要使用Windows API RegisterHotKey
-        Ok(())
+    pub fn register_global_hotkey(&mut self, key: KeyCode, hotkey_id: u32) -> crate::error::Result<()> {
+        use global_hotkey::{hotkey::HotKey, hotkey::Code, hotkey::Modifiers};
+
+        if let Some(ref manager) = self.hotkey_manager {
+            // 将KeyCode转换为global-hotkey的Code
+            let (code, modifiers) = self.keycode_to_global_hotkey(key)?;
+
+            let hotkey = HotKey::new(Some(modifiers), code);
+
+            manager.register(hotkey.clone())
+                .map_err(|e| crate::error::AppError::soundboard(format!("注册全局快捷键失败: {}", e)))?;
+
+            self.registered_hotkeys.insert(key, hotkey);
+
+            log::info!("全局快捷键注册成功: {:?}", key);
+            Ok(())
+        } else {
+            Err(crate::error::AppError::soundboard("快捷键管理器未初始化"))
+        }
     }
 
     /// 注销全局快捷键
-    pub fn unregister_global_hotkey(&mut self, _key: KeyCode) -> crate::error::Result<()> {
-        // TODO: 实现Windows全局快捷键注销
-        // 需要使用Windows API UnregisterHotKey
-        Ok(())
+    pub fn unregister_global_hotkey(&mut self, key: KeyCode) -> crate::error::Result<()> {
+        if let Some(ref manager) = self.hotkey_manager {
+            if let Some(hotkey) = self.registered_hotkeys.remove(&key) {
+                manager.unregister(hotkey)
+                    .map_err(|e| crate::error::AppError::soundboard(format!("注销全局快捷键失败: {}", e)))?;
+
+                log::info!("全局快捷键注销成功: {:?}", key);
+            }
+            Ok(())
+        } else {
+            Err(crate::error::AppError::soundboard("快捷键管理器未初始化"))
+        }
+    }
+
+    /// 注销所有快捷键
+    pub fn unregister_all(&mut self) -> crate::error::Result<()> {
+        if let Some(ref manager) = self.hotkey_manager {
+            for (key, hotkey) in self.registered_hotkeys.drain() {
+                if let Err(e) = manager.unregister(hotkey) {
+                    log::warn!("注销快捷键 {:?} 失败: {}", key, e);
+                }
+            }
+            log::info!("所有全局快捷键已注销");
+            Ok(())
+        } else {
+            Err(crate::error::AppError::soundboard("快捷键管理器未初始化"))
+        }
+    }
+
+    /// 将KeyCode转换为global-hotkey格式
+    fn keycode_to_global_hotkey(&self, key: KeyCode) -> crate::error::Result<(global_hotkey::hotkey::Code, global_hotkey::hotkey::Modifiers)> {
+        use global_hotkey::hotkey::{Code, Modifiers};
+
+        let (code, modifiers) = match key {
+            // 功能键
+            KeyCode::F1 => (Code::F1, Modifiers::empty()),
+            KeyCode::F2 => (Code::F2, Modifiers::empty()),
+            KeyCode::F3 => (Code::F3, Modifiers::empty()),
+            KeyCode::F4 => (Code::F4, Modifiers::empty()),
+            KeyCode::F5 => (Code::F5, Modifiers::empty()),
+            KeyCode::F6 => (Code::F6, Modifiers::empty()),
+            KeyCode::F7 => (Code::F7, Modifiers::empty()),
+            KeyCode::F8 => (Code::F8, Modifiers::empty()),
+            KeyCode::F9 => (Code::F9, Modifiers::empty()),
+            KeyCode::F10 => (Code::F10, Modifiers::empty()),
+            KeyCode::F11 => (Code::F11, Modifiers::empty()),
+            KeyCode::F12 => (Code::F12, Modifiers::empty()),
+
+            // 数字键
+            KeyCode::Num1 => (Code::Digit1, Modifiers::empty()),
+            KeyCode::Num2 => (Code::Digit2, Modifiers::empty()),
+            KeyCode::Num3 => (Code::Digit3, Modifiers::empty()),
+            KeyCode::Num4 => (Code::Digit4, Modifiers::empty()),
+            KeyCode::Num5 => (Code::Digit5, Modifiers::empty()),
+            KeyCode::Num6 => (Code::Digit6, Modifiers::empty()),
+            KeyCode::Num7 => (Code::Digit7, Modifiers::empty()),
+            KeyCode::Num8 => (Code::Digit8, Modifiers::empty()),
+            KeyCode::Num9 => (Code::Digit9, Modifiers::empty()),
+            KeyCode::Num0 => (Code::Digit0, Modifiers::empty()),
+
+            // Ctrl组合键
+            KeyCode::CtrlA => (Code::KeyA, Modifiers::CONTROL),
+            KeyCode::CtrlB => (Code::KeyB, Modifiers::CONTROL),
+            KeyCode::CtrlC => (Code::KeyC, Modifiers::CONTROL),
+            KeyCode::CtrlD => (Code::KeyD, Modifiers::CONTROL),
+            KeyCode::CtrlE => (Code::KeyE, Modifiers::CONTROL),
+
+            // Alt组合键
+            KeyCode::AltA => (Code::KeyA, Modifiers::ALT),
+            KeyCode::AltB => (Code::KeyB, Modifiers::ALT),
+            KeyCode::AltC => (Code::KeyC, Modifiers::ALT),
+            KeyCode::AltD => (Code::KeyD, Modifiers::ALT),
+            KeyCode::AltE => (Code::KeyE, Modifiers::ALT),
+
+            // 特殊键
+            KeyCode::Space => (Code::Space, Modifiers::empty()),
+            KeyCode::Enter => (Code::Enter, Modifiers::empty()),
+            KeyCode::Escape => (Code::Escape, Modifiers::empty()),
+
+            _ => {
+                return Err(crate::error::AppError::soundboard(format!("不支持的快捷键: {:?}", key)));
+            }
+        };
+
+        Ok((code, modifiers))
+    }
+
+    /// 获取已注册的快捷键列表
+    pub fn get_registered_keys(&self) -> Vec<KeyCode> {
+        self.registered_hotkeys.keys().cloned().collect()
     }
 }

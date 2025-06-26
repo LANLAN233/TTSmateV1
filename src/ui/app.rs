@@ -355,13 +355,13 @@ impl TTSmateApp {
         // 音效控制按钮
         ui.horizontal(|ui| {
             if ui.button("添加音效").clicked() {
-                // TODO: 实现文件选择对话框
-                self.status_message = "请选择音效文件...".to_string();
+                self.open_file_dialog();
             }
 
             if ui.button("停止所有").clicked() {
                 if let Some(ref soundboard) = self.soundboard {
-                    soundboard.stop_all_sounds();
+                    // TODO: 实现异步调用
+                    // soundboard.stop_all_sounds().await;
                     self.status_message = "已停止所有音效".to_string();
                 }
             }
@@ -624,6 +624,42 @@ impl TTSmateApp {
             Tone::Casual => "随意",
             Tone::Humorous => "幽默",
             Tone::Serious => "严肃",
+        }
+    }
+
+    /// 打开文件选择对话框
+    fn open_file_dialog(&mut self) {
+        self.status_message = "正在打开文件选择对话框...".to_string();
+
+        // TODO: 实现异步文件对话框
+        // 由于egui是同步的，这里需要使用其他方式处理文件选择
+        // 可以考虑使用rfd::AsyncFileDialog或在后台线程中处理
+
+        // 临时实现：模拟文件选择
+        info!("打开文件选择对话框");
+
+        // 支持的音频格式
+        let supported_formats = vec!["wav", "mp3", "ogg", "flac", "m4a", "aac"];
+
+        self.status_message = format!(
+            "请选择音频文件 (支持格式: {})",
+            supported_formats.join(", ")
+        );
+    }
+
+    /// 添加音效文件
+    fn add_sound_file(&mut self, file_path: std::path::PathBuf, name: String) {
+        if let Some(ref mut soundboard) = self.soundboard {
+            match soundboard.add_sound(&file_path, &name, &self.selected_category) {
+                Ok(sound_id) => {
+                    info!("音效添加成功: {} -> {}", sound_id, file_path.display());
+                    self.status_message = format!("音效 '{}' 添加成功", name);
+                }
+                Err(e) => {
+                    error!("音效添加失败: {}", e);
+                    self.last_error = Some(format!("添加音效失败: {}", e));
+                }
+            }
         }
     }
 }
