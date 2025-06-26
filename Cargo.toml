@@ -63,6 +63,9 @@ uuid = { version = "1.0", features = ["v4"] }
 # Base64编解码
 base64 = "0.21"
 
+# 目录管理
+dirs = "5.0"
+
 [dev-dependencies]
 # 测试框架
 tokio-test = "0.4"
