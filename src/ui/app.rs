@@ -10,6 +10,8 @@ use tokio::sync::Mutex;
 use crate::config::AppConfig;
 use crate::tts::TTSClient;
 use crate::ai::{AIContentGenerator, ContentType, GenerationOptions, Tone};
+use crate::soundboard::{SoundBoard, SoundEffect};
+use crate::audio::{AudioRouter, AudioStats};
 use crate::error::{AppError, Result};
 
 /// TTSmate主应用程序
@@ -17,6 +19,8 @@ pub struct TTSmateApp {
     config: AppConfig,
     tts_client: Option<TTSClient>,
     ai_generator: Option<AIContentGenerator>,
+    soundboard: Option<SoundBoard>,
+    audio_router: Option<AudioRouter>,
 
     // UI状态
     current_tab: Tab,
@@ -33,6 +37,10 @@ pub struct TTSmateApp {
     ai_generated_content: String,
     selected_content_type: ContentType,
     selected_tone: Tone,
+
+    // 音效板状态
+    sound_categories: Vec<String>,
+    selected_category: String,
 
     // 错误状态
     last_error: Option<String>,
@@ -81,6 +89,30 @@ impl TTSmateApp {
             None
         };
 
+        // 创建音效板
+        let soundboard = match SoundBoard::new() {
+            Ok(board) => {
+                info!("音效板创建成功");
+                Some(board)
+            }
+            Err(e) => {
+                error!("音效板创建失败: {}", e);
+                None
+            }
+        };
+
+        // 创建音频路由器
+        let audio_router = match AudioRouter::new(config.audio.clone()) {
+            Ok(router) => {
+                info!("音频路由器创建成功");
+                Some(router)
+            }
+            Err(e) => {
+                error!("音频路由器创建失败: {}", e);
+                None
+            }
+        };
+
         // 获取可用语音列表
         let available_voices = if let Some(ref client) = tts_client {
             match client.get_voices().await {
@@ -100,6 +132,8 @@ impl TTSmateApp {
             config,
             tts_client,
             ai_generator,
+            soundboard,
+            audio_router,
             current_tab: Tab::TTS,
             text_input: String::new(),
             status_message: "就绪".to_string(),
@@ -110,6 +144,8 @@ impl TTSmateApp {
             ai_generated_content: String::new(),
             selected_content_type: ContentType::Chat,
             selected_tone: Tone::Friendly,
+            sound_categories: vec!["默认".to_string(), "反应".to_string(), "音乐".to_string()],
+            selected_category: "默认".to_string(),
             last_error: None,
         })
     }
@@ -297,16 +333,120 @@ impl TTSmateApp {
     fn render_soundboard_tab(&mut self, ui: &mut egui::Ui) {
         ui.heading("音效板");
         ui.separator();
-        
-        ui.label("音效板功能正在开发中...");
-        
-        // TODO: 实现音效板界面
+
+        // 分类选择
+        ui.horizontal(|ui| {
+            ui.label("音效分类:");
+            egui::ComboBox::from_label("")
+                .selected_text(&self.selected_category)
+                .show_ui(ui, |ui| {
+                    for category in &self.sound_categories.clone() {
+                        ui.selectable_value(&mut self.selected_category, category.clone(), category);
+                    }
+                });
+
+            if ui.button("添加分类").clicked() {
+                // TODO: 实现添加分类对话框
+            }
+        });
+
+        ui.add_space(10.0);
+
+        // 音效控制按钮
+        ui.horizontal(|ui| {
+            if ui.button("添加音效").clicked() {
+                // TODO: 实现文件选择对话框
+                self.status_message = "请选择音效文件...".to_string();
+            }
+
+            if ui.button("停止所有").clicked() {
+                if let Some(ref soundboard) = self.soundboard {
+                    soundboard.stop_all_sounds();
+                    self.status_message = "已停止所有音效".to_string();
+                }
+            }
+
+            if ui.button("刷新列表").clicked() {
+                self.status_message = "音效列表已刷新".to_string();
+            }
+        });
+
+        ui.add_space(10.0);
+
+        // 音效网格
+        if let Some(ref soundboard) = self.soundboard {
+            let sounds = soundboard.get_sounds(Some(&self.selected_category));
+
+            if sounds.is_empty() {
+                ui.label(format!("分类 '{}' 中没有音效", self.selected_category));
+                ui.label("点击 '添加音效' 按钮来添加音效文件");
+            } else {
+                // 使用网格布局显示音效按钮
+                egui::Grid::new("sound_grid")
+                    .num_columns(4)
+                    .spacing([10.0, 10.0])
+                    .show(ui, |ui| {
+                        for (index, sound) in sounds.iter().enumerate() {
+                            if index > 0 && index % 4 == 0 {
+                                ui.end_row();
+                            }
+
+                            let button = egui::Button::new(&sound.name)
+                                .min_size(egui::vec2(100.0, 60.0));
+
+                            if ui.add(button).clicked() {
+                                // TODO: 实现异步音效播放
+                                self.status_message = format!("播放音效: {}", sound.name);
+                            }
+                        }
+                    });
+            }
+        } else {
+            ui.colored_label(egui::Color32::RED, "音效板未初始化");
+        }
+
         ui.add_space(20.0);
-        ui.label("功能包括:");
-        ui.label("• 音效文件管理");
-        ui.label("• 快捷键绑定");
-        ui.label("• 音效分类");
-        ui.label("• 实时播放");
+
+        // 音效板统计信息
+        if let Some(ref soundboard) = self.soundboard {
+            let stats = soundboard.get_stats();
+            ui.collapsing("统计信息", |ui| {
+                ui.label(format!("总音效数: {}", stats.total_sounds));
+                ui.label(format!("分类数: {}", stats.total_categories));
+                ui.label(format!("快捷键绑定: {}", stats.total_keybindings));
+                ui.label(format!("总时长: {:.1} 秒", stats.total_duration.as_secs_f32()));
+            });
+        }
+
+        // 音量控制
+        ui.add_space(10.0);
+        ui.horizontal(|ui| {
+            ui.label("主音量:");
+            let mut volume = if let Some(ref soundboard) = self.soundboard {
+                soundboard.get_master_volume()
+            } else {
+                1.0
+            };
+
+            if ui.add(egui::Slider::new(&mut volume, 0.0..=2.0).text("")).changed() {
+                if let Some(ref mut soundboard) = self.soundboard {
+                    soundboard.set_master_volume(volume);
+                }
+            }
+
+            ui.label(format!("{:.0}%", volume * 100.0));
+        });
+
+        // 快捷键设置
+        ui.add_space(10.0);
+        ui.collapsing("快捷键设置", |ui| {
+            ui.label("快捷键绑定功能正在开发中...");
+            ui.label("将支持:");
+            ui.label("• F1-F12 功能键");
+            ui.label("• Ctrl+字母 组合键");
+            ui.label("• Alt+字母 组合键");
+            ui.label("• 数字键 1-0");
+        });
     }
 
     /// 渲染设置标签页
@@ -353,11 +493,34 @@ impl TTSmateApp {
                 });
 
                 ui.horizontal(|ui| {
+                    ui.label("缓冲区大小:");
+                    ui.add(egui::DragValue::new(&mut self.config.audio.buffer_size).range(64..=8192));
+                });
+
+                ui.horizontal(|ui| {
                     ui.label("主音量:");
                     ui.add(egui::Slider::new(&mut self.config.audio.master_volume, 0.0..=2.0));
                 });
 
-                ui.checkbox(&mut self.config.audio.enable_virtual_cable, "启用虚拟声卡");
+                ui.checkbox(&mut self.config.audio.enable_virtual_cable, "启用VB Cable");
+                ui.checkbox(&mut self.config.audio.enable_voicemeeter, "启用Voicemeeter");
+
+                // 音频设备信息
+                if let Some(ref audio_router) = self.audio_router {
+                    ui.add_space(10.0);
+                    ui.label("音频设备:");
+
+                    let input_devices = audio_router.get_input_devices();
+                    let output_devices = audio_router.get_output_devices();
+                    let virtual_devices = audio_router.get_virtual_devices();
+
+                    ui.label(format!("输入设备: {} 个", input_devices.len()));
+                    ui.label(format!("输出设备: {} 个", output_devices.len()));
+                    ui.label(format!("虚拟设备: {} 个", virtual_devices.len()));
+
+                    let stats = audio_router.get_audio_stats();
+                    ui.label(format!("活跃音频流: {}", stats.active_streams));
+                }
             });
 
             ui.add_space(20.0);
@@ -502,6 +665,24 @@ impl eframe::App for TTSmateApp {
                     ui.label("🟢 AI已配置");
                 } else {
                     ui.colored_label(egui::Color32::RED, "🔴 AI未配置");
+                }
+
+                ui.separator();
+
+                if let Some(ref soundboard) = self.soundboard {
+                    let stats = soundboard.get_stats();
+                    ui.label(format!("🎵 音效: {}", stats.total_sounds));
+                } else {
+                    ui.colored_label(egui::Color32::RED, "🔴 音效板未初始化");
+                }
+
+                ui.separator();
+
+                if let Some(ref audio_router) = self.audio_router {
+                    let stats = audio_router.get_audio_stats();
+                    ui.label(format!("🔊 音频: {}/{}", stats.active_streams, stats.input_devices + stats.output_devices));
+                } else {
+                    ui.colored_label(egui::Color32::RED, "🔴 音频未初始化");
                 }
             });
         });
