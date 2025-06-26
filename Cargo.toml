@@ -75,6 +75,7 @@ criterion = "0.5"
 [build-dependencies]
 # Windows资源编译
 winres = "0.1"
+chrono = "0.4"
 
 [[bin]]
 name = "ttsmate"
