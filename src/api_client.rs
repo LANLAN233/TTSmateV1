@@ -1,4 +1,4 @@
-use crate::config::{ApiKeys, AppSettings};
+use crate::config::{ApiKeys};
 use crate::error::AppError;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -52,6 +52,7 @@ impl ApiClient {
     pub async fn call_deepseek_api(
         &self,
         api_key: &str,
+        system_prompt: &str,
         user_prompt: &str,
     ) -> Result<String, AppError> {
         let request_payload = DeepSeekRequest {
@@ -59,7 +60,7 @@ impl ApiClient {
             messages: vec![
                 Message {
                     role: "system",
-                    content: "你是一个为TTS语音合成生成文本的助手，请将回答限制在100个汉字以内。",
+                    content: system_prompt,
                 },
                 Message {
                     role: "user",
@@ -108,8 +109,11 @@ impl ApiClient {
     pub async fn call_baidu_tts_api(
         &self,
         api_keys: &ApiKeys,
-        settings: &AppSettings,
         text: &str,
+        speed: i32,
+        pitch: i32,
+        volume: i32,
+        person: i32,
     ) -> Result<Vec<u8>, AppError> {
         let access_token = self
             .get_baidu_access_token(&api_keys.baidu_api_key, &api_keys.baidu_secret_key)
@@ -117,10 +121,10 @@ impl ApiClient {
 
         let url = "https://tsn.baidu.com/text2audio";
         
-        let spd = &settings.speed.to_string();
-        let pit = &settings.pitch.to_string();
-        let vol = &settings.volume.to_string();
-        let per = &settings.person.to_string();
+        let spd = &speed.to_string();
+        let pit = &pitch.to_string();
+        let vol = &volume.to_string();
+        let per = &person.to_string();
 
         let params = [
             ("tex", text),

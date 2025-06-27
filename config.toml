@@ -17,4 +17,34 @@ pitch = 5
 # 音量，取值0-15，默认为5中音量
 volume = 5
 # 发音人, 0为女声，1为男声，3为情感合成-度逍遥，4为情感合成-度丫丫
-person = 0 
+person = 0
+
+[ai_settings]
+# 默认的system role prompt
+default_prompt = "你是一个为TTS语音合成生成文本的助手，请将回答限制在100个汉字以内。"
+
+# 可选的模板
+prompts = [
+    { name = "标准助手", template = "你是一个为TTS语音合成生成文本的助手，请将回答限制在100个汉字以内。" },
+    { name = "客服模式", template = "你是一位专业的客服，请用友好和耐心的语气回答问题，并把回答限制在100个汉字以内。" },
+    { name = "游戏旁白", template = "请你扮演一个游戏旁白（GM），用神秘且引人入胜的语气描述以下场景，并把回答限制在100个汉字以内。" },
+]
+
+# --- 音效板配置 ---
+# 用户可以通过界面动态添加音效，这里的配置仅作为示例
+# [[soundboard]]
+# name = "胜利"
+# path = "sounds/victory.mp3"
+# 
+# [[soundboard]]
+# name = "失败"
+# path = "sounds/failure.mp3"
+
+# 音效板配置
+[[soundboard]]
+name = "音效1"
+path = "sounds/sound1.wav"
+
+[[soundboard]]
+name = "音效2"
+path = "sounds/sound2.mp3" 
