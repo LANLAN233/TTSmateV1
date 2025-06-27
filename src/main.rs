@@ -4,7 +4,7 @@ mod error;
 
 use std::sync::{mpsc, Arc};
 use eframe::egui;
-use tokio::runtime::Runtime;
+use tokio::runtime::{Runtime, Handle};
 use rodio::{OutputStream, OutputStreamHandle, Decoder, Sink};
 use rodio::cpal::traits::{HostTrait, DeviceTrait};
 
@@ -41,6 +41,7 @@ enum UIMessage {
 
 struct TTSApp {
     rt: Runtime,
+    handle: Handle,
     prompt_text: String,
     response_text: String,
     status_text: String,
@@ -99,8 +100,12 @@ impl TTSApp {
         let (_stream, stream_handle) = OutputStream::try_from_device(&devices[selected_device_index])?;
         let tts_sink = Sink::try_new(&stream_handle)?;
         
+        let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
+        let handle = rt.handle().clone();
+
         Ok(Self {
-            rt: tokio::runtime::Builder::new_multi_thread().enable_all().build()?,
+            rt,
+            handle,
             prompt_text: "你好".to_string(),
             response_text: "".to_string(),
             status_text: AppState::Idle.to_string(),
@@ -133,7 +138,8 @@ impl TTSApp {
     }
 
     fn play_tts_data(&self, data: Arc<Vec<u8>>) {
-        if let Ok(source) = Decoder::new(std::io::Cursor::new(data)) {
+        let data_slice = data.as_ref().clone();
+        if let Ok(source) = Decoder::new(std::io::Cursor::new(data_slice)) {
             self.tts_sink.clear();
             self.tts_sink.append(source);
             self.tts_sink.play();
@@ -397,7 +403,7 @@ impl eframe::App for TTSApp {
                 let save_button_enabled = self.last_tts_audio.is_some();
                 if ui.add_enabled(save_button_enabled, egui::Button::new("💾 保存音频")).clicked() {
                     if let Some(audio_data) = self.last_tts_audio.clone() {
-                        let rt = self.rt.clone();
+                        let handle = self.handle.clone();
                         let sender = self.ui_sender.clone();
                         self.status_text = "准备保存...".to_string();
                         std::thread::spawn(move || {
@@ -406,7 +412,7 @@ impl eframe::App for TTSApp {
                                 .set_file_name("tts_audio.mp3")
                                 .save_file()
                             {
-                                rt.spawn(async move {
+                                handle.spawn(async move {
                                     match tokio::fs::write(&path, &*audio_data).await {
                                         Ok(_) => { let _ = sender.send(UIMessage::UpdateState(AppState::Idle)); },
                                         Err(e) => { let _ = sender.send(UIMessage::Error(format!("保存失败: {}", e))); }
