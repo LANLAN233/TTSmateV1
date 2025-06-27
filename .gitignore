@@ -62,7 +62,10 @@ test_audio/
 *.pdb
 *.ilk
 
-
 # Added by cargo
 
 /target
+
+*.mp4
+*.png
+程序相关报告/
