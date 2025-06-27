@@ -2,13 +2,23 @@
 # 复制此文件为 config.toml 并根据需要修改配置
 
 [tts]
-# TTS服务器配置
-server_url = "http://192.168.11.153:8080"
+# TTS配置
 timeout_seconds = 30
 retry_count = 3
 cache_enabled = true
-default_voice = "Default"
-audio_format = "wav"
+default_voice = "1"  # 默认使用标准女声
+audio_format = "mp3"
+
+[tts.baidu]
+# 百度TTS API配置
+api_key = "F9R262dgN5LcXOtNTRcQ6u1u"  # 百度API密钥
+secret_key = "uRHLKBxb9ggQqxHlwSMrio8UTC5hhmNT"  # 百度Secret Key
+cuid = "TTSmate"  # 用户唯一标识
+speed = 5  # 语速，取值0-15，默认为5中语速
+pitch = 5  # 音调，取值0-15，默认为5中语调
+volume = 5  # 音量，取值0-15，默认为5中音量
+voice = 1  # 发音人选择，默认为1
+aue = 3  # 音频格式：3=mp3(默认)；4=pcm-16k；5=pcm-8k；6=wav
 
 [ai]
 # AI文案生成配置
@@ -30,7 +40,7 @@ enable_virtual_cable = true
 enable_voicemeeter = false
 
 [ui]
-# 用户界面配置
+# UI配置
 theme = "dark"
 font_size = 14.0
 window_width = 1200.0

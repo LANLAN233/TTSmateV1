@@ -1,0 +1,20 @@
+# TTSmate 配置文件
+
+[api_keys]
+# 请在此处填入你的 DeepSeek API Key
+deepseek_api_key = "sk-029400edc742427da0f44f22c174e1e0"
+
+# 百度 TTS API Keys
+baidu_api_key = "F9R262dgN5LcXOtNTRcQ6u1u"
+baidu_secret_key = "uRHLKBxb9ggQqxHlwSMrio8UTC5hhmNT"
+
+[app_settings]
+# 默认的 TTS 语音设置
+# 语速，取值0-15，默认为5中语速
+speed = 5
+# 音调，取值0-15，默认为5中语调
+pitch = 5
+# 音量，取值0-15，默认为5中音量
+volume = 5
+# 发音人, 0为女声，1为男声，3为情感合成-度逍遥，4为情感合成-度丫丫
+person = 0 

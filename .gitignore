@@ -61,3 +61,8 @@ test_audio/
 # Windows specific
 *.pdb
 *.ilk
+
+
+# Added by cargo
+
+/target
